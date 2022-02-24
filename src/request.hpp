@@ -35,6 +35,8 @@ class request {  //TODO: add some exception control
     void initHostandPort();
     size_t getDataLen();
     std::vector<char> getvalidationheader();
+    bool needrevalidation();
+    bool needCache();
     ~request();
 };
 
@@ -201,6 +203,16 @@ std::vector<char> request::getvalidationheader() {
     re.push_back('\r');
     re.push_back('\n');
     return re;
+}
+
+bool request::needrevalidation() {
+    if(headers["no-cache"] != "false") return true;
+    else return false;
+}
+
+bool request::needCache() {
+    if(headers["no-store"] == "false") return true;
+    else return false;
 }
 
 request::~request() {

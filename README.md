@@ -1,0 +1,1 @@
+This project builds a simple cache proxy which could deal with GET POST and CONNECT method.

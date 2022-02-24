@@ -1,0 +1,17 @@
+1. Q: What if we cannot build connection to origin server of client? Or there is some failure in socket?
+A: If there is such exception, we will catch it at the top level function and print the error message. Then the program will just loop again.
+
+2. Q: What if socket cannot send all of his data to server or client and return before it finishes its work?
+A: We use while loop function to handle this situation, we wiil loop until all the data send to client or server.
+
+3. Q: What if the file descriptor or some other source cannot be free when there is exception?
+A: This is not a problem, we catch the exception and use RAII principle to design our program.
+
+4. Q: What if the mutex still be locked when there is exception happen?
+A: We use the C++ smart class lock_guard to deal with such problem, so the lock will be free when there is exception.
+
+5. Q: What if there are many thread try to serve the same clients?
+A: We use a simple thread pool and producer-consumer mode to serve clients, and each of them only could get one client.
+
+6. Q: What if there is some header that we cannot understand or some response that proxy couldn't parse?
+A: If we cannot parse the response, we will just send the data to client or server without any process.

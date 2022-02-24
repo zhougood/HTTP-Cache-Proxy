@@ -40,9 +40,9 @@ class routine {
   //send data to client
   void send_client(connSocket & fd, response & origServer_response, std::vector<char> * response_content);
   //handle response and determine whether it need to put into the cache
-  void handleResponse(std::string URI, response & origResponse, std::vector<char> * response_content);
+  void handleResponse(std::string URI, request & clientrequest, response & origResponse, std::vector<char> * response_content);
   //check whether need to revalidation
-  bool checkValidation(response & cacheheader);
+  bool checkValidation(request & clientrequest, response & cacheheader);
   //check if the response is expire or not
   bool checkTime(response & cacheheader);
   //send revalidation info to server
@@ -63,14 +63,11 @@ void routine::run() {
     std::string port = client_request.getport();
 
     if(method == "GET") {
-        //std::cout << "GET" << std::endl;
         std::string URI = client_request.getURI();
-        //std::cout << URI << std::endl;
-        if(cacheBase->exist(URI)) {//if there is a cache in the cacheBase
-            //std::cout << "cache in" << std::endl;
+        if(client_request.getheader("no-store") == "false" && cacheBase->exist(URI)) {//if there is a cache in the cacheBase
             response cacheHeader = cacheBase->getHttpHeader(URI);
             std::vector<std::string> returnHeader;
-            if(checkValidation(cacheHeader) || checkTime(cacheHeader)) {  //check some header to determine whether need revalidation
+            if(checkValidation(client_request, cacheHeader) || checkTime(cacheHeader)) {  //check some header to determine whether need revalidation
                 connSocket origServer;
                 origServer.build_client(host, port);
                 revalidate(origServer, client_request, cacheHeader); //send revalidation httpheader
@@ -78,18 +75,12 @@ void routine::run() {
                 response validationInfo = response(returnHeader);
                 LOG->receive_response(client->user_id, validationInfo.firstline, client_request.gethost());
                 if(validationInfo.getStatusNum() == "200") {
-                    //std::cout << "return 200" << std::endl;
                     std::vector<char> * response_content = getResponseContent(validationInfo, origServer);
-                    handleResponse(URI, validationInfo, response_content);
-                    //send_client(*client, validationInfo, response_content);
+                    handleResponse(URI, client_request, validationInfo, response_content);
                     delete response_content;
                 } else if(validationInfo.getStatusNum() == "304"){ //304 still validation
-                    //std::cout << "return 304" << std::endl;
                     cacheBase->updateHeader(URI, validationInfo); //update header
-                    //cacheBase->getContent(URI);
-                    //send_client();
                 } else {
-                    //std::cout << "return other number" << std::endl;
                     std::vector<char> * response_content = getResponseContent(validationInfo, origServer);
                     send_client(*client, validationInfo, response_content);
                     delete response_content;
@@ -109,7 +100,6 @@ void routine::run() {
             response orig_response(origServer.readhttp());
             LOG->receive_response(client->user_id, orig_response.firstline, client_request.gethost());
             std::vector<char> * response_content;
-            //std::cout << "get in" << std::endl;
             try
             {
                 response_content = getResponseContent(orig_response, origServer);
@@ -120,7 +110,7 @@ void routine::run() {
                 throw e;
             }
 
-            handleResponse(URI, orig_response, response_content);
+            handleResponse(URI, client_request, orig_response, response_content);
             send_client(*client, orig_response, response_content);
             delete response_content;
             origServer.closefd();
@@ -159,7 +149,6 @@ void routine::run() {
     } else if (method == "CONNECT") {
         connSocket origServer;
         origServer.build_client(host, port);
-        //std::cout << "connect to origin server" << std::endl;
         // response OK
         try
         {
@@ -204,8 +193,8 @@ void routine::run() {
     
 }
 
-bool routine::checkValidation(response & cacheHeader) {
-    if(cacheHeader.needrevalidation()) {
+bool routine::checkValidation(request & clientrequest, response & cacheHeader) {
+    if(cacheHeader.needrevalidation() && clientrequest.needrevalidation()) {
         LOG->require_validation(client->user_id);
         return true;
     } else {
@@ -241,8 +230,8 @@ void routine::revalidate(connSocket & origServer, request & client_request, resp
  * @param origResponse 
  * @param response_content 
  */
-void routine::handleResponse(std::string URI, response & origResponse, std::vector<char> * response_content) {
-    if(origResponse.needCache()) {
+void routine::handleResponse(std::string URI, request & clientrequest, response & origResponse, std::vector<char> * response_content) {
+    if(clientrequest.needCache() && origResponse.needCache()) {
         if(origResponse.needrevalidation()) {
             LOG->cached_need_revalidate(client->user_id);
         } else {
@@ -251,6 +240,9 @@ void routine::handleResponse(std::string URI, response & origResponse, std::vect
         }
         cacheBase->put(URI, origResponse, *response_content);
     } else {
+        if(!clientrequest.needCache()) {
+            LOG->not_cacheable(client->user_id, "no-store");
+        }
         LOG->not_cacheable(client->user_id, origResponse.getReason());
     }
 }
@@ -285,16 +277,16 @@ std::vector<char> * routine::getResponseContent(response & origServer_response, 
     } else return getcontent_Loop(origServer);
 }
 
-std::vector<char> * routine::getcontent_Len(unsigned long len, connSocket & fd) {  //TODO: delete re when encounter exception
+std::vector<char> * routine::getcontent_Len(unsigned long len, connSocket & fd) {
     std::vector<char> * re = new std::vector<char>(len);
     if(fd.readnB(re->data(), len) <= 0) {
         delete re;
         throw myexception("cannot get enough bytes from server");
-    }  //如果读入的数据小于len怎么办
+    }
     return re;
 }
 
-std::vector<char> * routine::getcontent_Chunk(connSocket & fd) {  //TODO: delete re when encounter exception
+std::vector<char> * routine::getcontent_Chunk(connSocket & fd) {
     std::vector<char> * re = new std::vector<char>(0);
     size_t size = 0;
     size_t cur = 0;
@@ -310,8 +302,6 @@ std::vector<char> * routine::getcontent_Chunk(connSocket & fd) {  //TODO: delete
             throw e;
         }
         unsigned long num = std::stoul(chunk_len.substr(0, chunk_len.size()-1), nullptr, 16);
-        //std::cout << chunk_len;
-        //std::cout << num << std::endl;
         size += num + 2 + chunk_len.length();
         std::copy(chunk_len.begin(), chunk_len.end(), std::back_inserter(*re));
         cur += chunk_len.length();
@@ -326,12 +316,11 @@ std::vector<char> * routine::getcontent_Chunk(connSocket & fd) {  //TODO: delete
     return re;
 }
 
-std::vector<char> * routine::getcontent_Loop(connSocket & fd) {  //TODO: delete re when encounter exception
+std::vector<char> * routine::getcontent_Loop(connSocket & fd) {
     std::vector<char> * re = new std::vector<char>(3000);
     ssize_t n;
     size_t size = 0;
     while((n = fd.readnB(&(re->data()[size]), 3000)) > 0) {
-        //std::cout << re->size() << std::endl;
         size += n;
         re->resize(size + 3000);
     }

@@ -15,12 +15,14 @@
 void basic_deamon();
 void handle_thread(fifo * connPoll, cache * c, logger * LOG);
 
+//std::ofstream logfile("log.txt");
 std::ofstream logfile("/var/log/erss/proxy.log");
 
 int main() {
     
     basic_deamon();
 
+    signal(SIGPIPE, SIG_IGN);
     //this is a connection Poll which holds
     fifo * connPoll = new fifo(128);
     cache * c = new cache(512);

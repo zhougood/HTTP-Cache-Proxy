@@ -53,8 +53,8 @@ int main() {
     std::cout << timetool.getExpiresTime(testhttpTime, 120) << std::endl;
     //std::cout << ans << std::endl;
 
-    logger LOG("output");
-    LOG.log_request("123", "req", "123.24.23.34");
+    //logger LOG("output");
+    //LOG.log_request("123", "req", "123.24.23.34");
 }
 
 
