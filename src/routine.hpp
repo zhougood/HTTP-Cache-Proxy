@@ -63,11 +63,11 @@ void routine::run() {
     std::string port = client_request.getport();
 
     if(method == "GET") {
-        std::cout << "GET" << std::endl;
+        //std::cout << "GET" << std::endl;
         std::string URI = client_request.getURI();
-        std::cout << URI << std::endl;
+        //std::cout << URI << std::endl;
         if(cacheBase->exist(URI)) {//if there is a cache in the cacheBase
-            std::cout << "cache in" << std::endl;
+            //std::cout << "cache in" << std::endl;
             response cacheHeader = cacheBase->getHttpHeader(URI);
             std::vector<std::string> returnHeader;
             if(checkValidation(cacheHeader) || checkTime(cacheHeader)) {  //check some header to determine whether need revalidation
@@ -159,7 +159,7 @@ void routine::run() {
     } else if (method == "CONNECT") {
         connSocket origServer;
         origServer.build_client(host, port);
-        std::cout << "connect to origin server" << std::endl;
+        //std::cout << "connect to origin server" << std::endl;
         // response OK
         try
         {

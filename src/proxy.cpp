@@ -14,9 +14,7 @@
 
 void basic_deamon();
 void handle_thread(fifo * connPoll, cache * c, logger * LOG);
-//void handle_thread(connSocket * clientfd, cache * c);
 
-//std::ofstream logfile("log.txt");
 std::ofstream logfile("/var/log/erss/proxy.log");
 
 int main() {
@@ -26,7 +24,6 @@ int main() {
     //this is a connection Poll which holds
     fifo * connPoll = new fifo(128);
     cache * c = new cache(512);
-    //logger * LOG = new logger(std::string("log.txt"));
     
     logger * LOG = new logger(&logfile);
     
@@ -35,31 +32,17 @@ int main() {
         threadPoll[i] = std::thread(handle_thread, connPoll, c, LOG);
         threadPoll[i].detach();
     }
-    
-    /*
-    connSocket server;
-    int user_id = 1;
-    server.build_server("12345");
-    //std::thread threadPoll[20];
-    for(int i = 0; i < 20; i++) {
-        std::thread worker(handle_thread, server.acceptConnection(user_id), c);
-        user_id++;
-        worker.detach();
-    }
-    delete c;
-    */
+
     connSocket server;
     server.build_server("12345");
 
-    std::cout << "build success" << std::endl;
+    //std::cout << "build success" << std::endl;
     int user_id = 1;
     while(1) {
         try
         {
             //produce read Socket to connPoll.
             connPoll->produce(server.acceptConnection(user_id));
-            //std::thread worker(handle_thread, server.acceptConnection(user_id), c);
-            //worker.detach();
             user_id++;
         }
         catch(const std::exception& e)
@@ -90,58 +73,6 @@ void handle_thread(fifo * connPoll, cache * c, logger * LOG) {
         delete clientfd;
     }
 }
-
-/*
-void handle_thread(connSocket * clientfd, cache * c) {
-    //std::cout << "begin work " << std::this_thread::get_id() << std::endl;
-    //connSocket * clientfd = connPoll->consume();
-    routine service(clientfd, c);
-    try
-    {
-        service.run();
-        signal(SIGPIPE, SIG_IGN);
-    }
-    catch(const std::exception& e)
-    {
-        
-        std::cerr << e.what() << '\n';
-    }
-    std::cout << clientfd->getFD() << std::endl;
-    clientfd->closefd();
-    delete clientfd;
-    std::cout << "delete clientfd" << std::endl;
-    
-}
-*/
-
-/*
-void deamon() {
-    pid_t pid;
-
-    if ((pid == fork()) < 0)
-        return (-1);
-    else if (pid)
-        exit(0); // parent terminates
-
-    if (setsid() < 0) // dissociate
-        return (-1);
-
-    dup2(STDOUT_FILENO, open("/dev/null", O_RDONLY));
-    dup2(STDIN_FILENO, open("/dev/null", O_RDWR));
-    dup2(STDERR_FILENO, open("/dev/null", O_RDWR));
-
-    chdir("/");
-    umask(0);
-    signal(SIGHUP, SIG_IGN);
-    signal(SIGPIPE, SIG_IGN);
-
-    if ((pid == fork()) < 0)
-        return (-1);
-    else if (pid)
-        exit(0);
-
-}
-*/
 
 void basic_deamon() {
     pid_t pid = fork();
